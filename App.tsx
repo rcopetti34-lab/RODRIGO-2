@@ -40,8 +40,6 @@ function App() {
 
     if (error) {
       console.error('Error fetching processes:', error);
-      // Fallback if table doesn't exist to avoid crashing completely in demo
-      // In production this would handle the error properly
     } else {
       setProcesses(data || []);
     }
@@ -78,14 +76,53 @@ function App() {
   };
 
   const handleDeleteProcess = async (id: string) => {
-    if (window.confirm("Tem certeza que deseja excluir este processo? Esta ação não pode ser desfeita.")) {
-      const { error } = await supabase
+    if (!window.confirm("Tem certeza que deseja excluir este processo permanentemente?")) {
+      return;
+    }
+
+    if (!session) return;
+
+    try {
+      // ESTRATÉGIA 1: Exclusão Padrão com verificação de dono (Owner)
+      // Isso muitas vezes passa por políticas de RLS padrão "users can delete their own items"
+      let { error, count } = await supabase
         .from('licitacao_processes')
-        .delete()
-        .eq('id', id);
+        .delete({ count: 'exact' })
+        .eq('id', id)
+        .eq('user_id', session.user.id);
+
+      // Se falhar ou não deletar nada (count 0 pode significar bloqueio silencioso ou ID mismatch)
+      if (error || count === 0) {
+        console.warn("Tentativa 1 falhou (Standard Delete). Tentando Estratégia 2 (Force ID)...");
         
-      if (error) alert(`Erro ao excluir: ${error.message}`);
-      else await fetchProcesses();
+        // ESTRATÉGIA 2: Exclusão Apenas por ID (Para casos onde RLS está desativado mas user_id pode estar nulo/diferente)
+        const res2 = await supabase
+          .from('licitacao_processes')
+          .delete()
+          .eq('id', id);
+        
+        error = res2.error;
+
+        if (error) {
+           console.warn("Tentativa 2 falhou. Tentando Estratégia 3 (RPC/Stored Procedure)...");
+
+           // ESTRATÉGIA 3: Workaround via RPC (Stored Procedure)
+           // Requer que o usuário tenha criado a função 'delete_licitacao_process' no SQL
+           const { error: rpcError } = await supabase.rpc('delete_licitacao_process', { target_id: id });
+           
+           if (rpcError) {
+             console.error("Todas as tentativas falharam.");
+             throw new Error(`Falha SQL: ${rpcError.message}. Tente criar a função RPC sugerida.`);
+           }
+        }
+      }
+
+      // Sucesso: Recarrega a lista
+      await fetchProcesses();
+
+    } catch (err: any) {
+      console.error("Erro ao excluir:", err);
+      alert(`Não foi possível excluir o registro.\n\nErro: ${err.message}\n\nDica: Se o erro persistir, execute o comando SQL fornecido para criar a função de exclusão segura.`);
     }
   };
 
@@ -283,7 +320,7 @@ function App() {
              <table className="min-w-max text-sm text-left border-collapse">
                <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-xs sticky top-0 z-10">
                  <tr>
-                   <th className="p-3 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-20 shadow-sm">A - Ações</th>
+                   <th className="p-3 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-20 shadow-sm">Ações</th>
                    <th className="p-3 border-b border-r border-slate-200 min-w-[140px]">B - PCA</th>
                    <th className="p-3 border-b border-r border-slate-200 min-w-[160px]">C - Status</th>
                    <th className="p-3 border-b border-r border-slate-200 min-w-[120px]">D - Prev. Start</th>
@@ -332,6 +369,7 @@ function App() {
                              >
                                <Edit size={16} />
                              </button>
+                             
                              <button 
                                onClick={() => handleDeleteProcess(process.id)}
                                className="p-1.5 text-red-600 hover:bg-red-50 rounded transition" 
