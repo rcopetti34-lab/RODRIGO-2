@@ -1,3 +1,4 @@
+
 export interface Processo {
   id: string;
   created_at: string;
@@ -44,6 +45,9 @@ export interface Processo {
   
   // Coluna P
   observacoes: string;
+
+  // Controle de Exclusão Lógica
+  cancelado?: boolean;
 }
 
 export interface DateCalculation {

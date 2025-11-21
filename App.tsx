@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Auth } from './components/Auth';
 import { ProcessForm } from './components/ProcessForm';
 import { Processo } from './types';
 import { calculateDuration, formatDate } from './utils/dateHelper';
-import { Plus, Search, Edit, Trash2, LayoutDashboard, Calendar, AlertCircle, CheckCircle2, Clock, FileText, Timer } from 'lucide-react';
+import { Plus, Search, Edit, LayoutDashboard, Clock, AlertCircle, CheckCircle2, FileText, Timer, Lock } from 'lucide-react';
 
 function App() {
   const [session, setSession] = useState<any>(null);
@@ -56,79 +57,35 @@ function App() {
   const handleSaveProcess = async (processData: Omit<Processo, 'id' | 'created_at' | 'user_id'>) => {
     if (!session) return;
 
-    if (editingProcess) {
-      // Update
-      const { error } = await supabase
-        .from('licitacao_processes')
-        .update(processData)
-        .eq('id', editingProcess.id);
-
-      if (error) alert(`Erro ao atualizar: ${error.message}`);
-    } else {
-      // Create
-      const { error } = await supabase
-        .from('licitacao_processes')
-        .insert([{ ...processData, user_id: session.user.id }]);
-        
-      if (error) alert(`Erro ao criar: ${error.message}`);
-    }
-    await fetchProcesses();
-  };
-
-  const handleDeleteProcess = async (id: string) => {
-    if (!window.confirm("Tem certeza que deseja excluir este processo permanentemente?")) {
-      return;
-    }
-
-    if (!session) return;
-
     try {
-      // ESTRATÉGIA 1: Exclusão Padrão com verificação de dono (Owner)
-      // Isso muitas vezes passa por políticas de RLS padrão "users can delete their own items"
-      let { error, count } = await supabase
-        .from('licitacao_processes')
-        .delete({ count: 'exact' })
-        .eq('id', id)
-        .eq('user_id', session.user.id);
-
-      // Se falhar ou não deletar nada (count 0 pode significar bloqueio silencioso ou ID mismatch)
-      if (error || count === 0) {
-        console.warn("Tentativa 1 falhou (Standard Delete). Tentando Estratégia 2 (Force ID)...");
-        
-        // ESTRATÉGIA 2: Exclusão Apenas por ID (Para casos onde RLS está desativado mas user_id pode estar nulo/diferente)
-        const res2 = await supabase
+      if (editingProcess) {
+        // Update
+        const { error } = await supabase
           .from('licitacao_processes')
-          .delete()
-          .eq('id', id);
-        
-        error = res2.error;
+          .update(processData)
+          .eq('id', editingProcess.id);
 
-        if (error) {
-           console.warn("Tentativa 2 falhou. Tentando Estratégia 3 (RPC/Stored Procedure)...");
-
-           // ESTRATÉGIA 3: Workaround via RPC (Stored Procedure)
-           // Requer que o usuário tenha criado a função 'delete_licitacao_process' no SQL
-           const { error: rpcError } = await supabase.rpc('delete_licitacao_process', { target_id: id });
-           
-           if (rpcError) {
-             console.error("Todas as tentativas falharam.");
-             throw new Error(`Falha SQL: ${rpcError.message}. Tente criar a função RPC sugerida.`);
-           }
-        }
+        if (error) throw error;
+      } else {
+        // Create
+        const { error } = await supabase
+          .from('licitacao_processes')
+          .insert([{ ...processData, user_id: session.user.id }]);
+          
+        if (error) throw error;
       }
-
-      // Sucesso: Recarrega a lista
       await fetchProcesses();
-
     } catch (err: any) {
-      console.error("Erro ao excluir:", err);
-      alert(`Não foi possível excluir o registro.\n\nErro: ${err.message}\n\nDica: Se o erro persistir, execute o comando SQL fornecido para criar a função de exclusão segura.`);
+      alert(`Erro ao salvar: ${err.message}`);
     }
   };
 
   // Filtering logic
   const filteredProcesses = useMemo(() => {
     return processes.filter(p => {
+      // Mostra apenas processos não cancelados
+      if (p.cancelado) return false;
+
       const matchesSearch = 
         p.objeto.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.modalidade?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -141,21 +98,26 @@ function App() {
     });
   }, [processes, searchTerm, statusFilter]);
 
-  // Insights Logic
+  // Insights Logic - CALCULADOS APENAS SOBRE PROCESSOS ATIVOS
   const insights = useMemo(() => {
+    const activeProcesses = processes.filter(p => !p.cancelado);
+    
     // Global counts
-    const total = processes.length;
-    const aguardando = processes.filter(p => p.status === 'Aguardando início').length;
-    const emElaboracao = processes.filter(p => p.status === 'Em elaboração').length;
-    const finalizado = processes.filter(p => p.status === 'Finalizado').length;
-    const prorrogado = processes.filter(p => p.status === 'Prorrogado').length;
+    const total = activeProcesses.length;
+    const aguardando = activeProcesses.filter(p => p.status === 'Aguardando início').length;
+    const emElaboracao = activeProcesses.filter(p => p.status === 'Em elaboração').length;
+    const finalizado = activeProcesses.filter(p => p.status === 'Finalizado').length;
+    const prorrogado = activeProcesses.filter(p => p.status === 'Prorrogado').length;
 
-    // Average Calculation based on FILTERED data (dados apresentados em tela)
+    // Average Calculation based on FILTERED active data
+    // As médias respeitam os filtros de busca atuais para prover insights dinâmicos
+    const targetForAvg = filteredProcesses;
+
     let totalBusinessDays = 0;
     let totalCalendarDays = 0;
     let countWithDates = 0;
 
-    filteredProcesses.forEach(p => {
+    targetForAvg.forEach(p => {
       if (p.inicio_planejamento && p.fim_planejamento) {
         const duration = calculateDuration(p.inicio_planejamento, p.fim_planejamento);
         totalBusinessDays += duration.businessDays;
@@ -202,7 +164,7 @@ function App() {
             <div className="bg-white p-4 rounded-lg shadow border-l-4 border-blue-500">
                <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-slate-500 text-xs font-bold uppercase">Total Processos</p>
+                    <p className="text-slate-500 text-xs font-bold uppercase">Total Ativos</p>
                     <p className="text-2xl font-bold text-slate-800">{insights.total}</p>
                   </div>
                   <FileText className="text-blue-200" />
@@ -244,7 +206,6 @@ function App() {
                   <AlertCircle className="text-red-200" />
                </div>
             </div>
-            {/* Novo Card de Média */}
             <div className="bg-white p-4 rounded-lg shadow border-l-4 border-indigo-500">
                <div className="flex justify-between items-start">
                   <div>
@@ -284,7 +245,7 @@ function App() {
                  onClick={() => setStatusFilter('Finalizado')}
                  className={`px-4 py-2 rounded-md text-sm font-medium transition ${statusFilter === 'Finalizado' ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                >
-                 Elaborados/Finalizados
+                 Finalizados
                </button>
                <button 
                  onClick={() => setStatusFilter('Prorrogado')}
@@ -294,17 +255,20 @@ function App() {
                </button>
             </div>
 
-            <div className="flex w-full lg:w-auto gap-3">
+            <div className="flex w-full lg:w-auto gap-3 items-center flex-wrap">
                <div className="relative flex-grow lg:flex-grow-0">
                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
                  <input 
                     type="text"
-                    placeholder="Pesquisar processos..."
+                    placeholder="Pesquisar..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full lg:w-64 pl-9 pr-4 py-2 bg-white text-black border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full lg:w-48 pl-9 pr-4 py-2 bg-white text-black border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none"
                  />
                </div>
+               
+               <div className="h-8 w-px bg-slate-300 mx-1 hidden lg:block"></div>
+
                <button 
                  onClick={() => { setEditingProcess(null); setIsModalOpen(true); }}
                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium transition shadow-sm whitespace-nowrap"
@@ -320,7 +284,7 @@ function App() {
              <table className="min-w-max text-sm text-left border-collapse">
                <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-xs sticky top-0 z-10">
                  <tr>
-                   <th className="p-3 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-20 shadow-sm">Ações</th>
+                   <th className="p-3 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-20 shadow-sm text-center min-w-[80px]">Ações</th>
                    <th className="p-3 border-b border-r border-slate-200 min-w-[140px]">B - PCA</th>
                    <th className="p-3 border-b border-r border-slate-200 min-w-[160px]">C - Status</th>
                    <th className="p-3 border-b border-r border-slate-200 min-w-[120px]">D - Prev. Start</th>
@@ -345,12 +309,17 @@ function App() {
                    </tr>
                  ) : filteredProcesses.length === 0 ? (
                     <tr>
-                     <td colSpan={16} className="p-8 text-center text-slate-500">Nenhum processo encontrado.</td>
+                     <td colSpan={16} className="p-8 text-center text-slate-500">
+                        Nenhum processo encontrado.
+                     </td>
                    </tr>
                  ) : (
                    filteredProcesses.map((process) => {
                      const duration = calculateDuration(process.inicio_planejamento, process.fim_planejamento);
                      
+                     // Verifica propriedade do processo
+                     const isOwner = session?.user?.id === process.user_id;
+
                      // Color logic for Status
                      let statusColorClass = 'bg-slate-100 text-slate-700';
                      if(process.status === 'Aguardando início') statusColorClass = 'bg-yellow-100 text-yellow-800 border border-yellow-200';
@@ -359,24 +328,24 @@ function App() {
                      if(process.status === 'Prorrogado') statusColorClass = 'bg-red-100 text-red-800 border border-red-200';
 
                      return (
-                       <tr key={process.id} className="hover:bg-slate-50 transition bg-white">
-                         <td className="p-2 border-r border-slate-200 sticky left-0 bg-white z-10 shadow-sm text-center">
-                           <div className="flex items-center justify-center gap-2">
-                             <button 
-                               onClick={() => { setEditingProcess(process); setIsModalOpen(true); }}
-                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition" 
-                               title="Alterar"
-                             >
-                               <Edit size={16} />
-                             </button>
+                       <tr key={process.id} className="hover:bg-slate-50 bg-white transition">
+                         <td className="p-2 border-r border-slate-200 sticky left-0 z-10 shadow-sm text-center bg-white">
+                           <div className="flex items-center justify-center gap-1">
                              
-                             <button 
-                               onClick={() => handleDeleteProcess(process.id)}
-                               className="p-1.5 text-red-600 hover:bg-red-50 rounded transition" 
-                               title="Excluir"
-                             >
-                               <Trash2 size={16} />
-                             </button>
+                             {!isOwner ? (
+                               <div className="p-1.5 text-slate-300 cursor-not-allowed" title="Apenas o criador pode alterar este processo">
+                                  <Lock size={16} />
+                               </div>
+                             ) : (
+                               <button 
+                                 onClick={() => { setEditingProcess(process); setIsModalOpen(true); }}
+                                 className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition" 
+                                 title="Alterar"
+                               >
+                                 <Edit size={18} />
+                               </button>
+                             )}
+
                            </div>
                          </td>
                          <td className="p-3 border-r border-slate-200">

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { Processo } from '../types';
 import { X } from 'lucide-react';
@@ -24,6 +25,7 @@ export const ProcessForm: React.FC<ProcessFormProps> = ({ initialData, onClose, 
     fiscais_gestores: '',
     foi_prorrogado: false,
     observacoes: '',
+    cancelado: false,
   });
   const [loading, setLoading] = useState(false);
 
