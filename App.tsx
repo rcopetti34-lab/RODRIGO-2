@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useMemo } from 'react';
 import { supabase } from './supabaseClient';
 import { Auth } from './components/Auth';
@@ -282,24 +281,24 @@ function App() {
         <div className="bg-white rounded-lg shadow overflow-hidden border border-slate-200 flex flex-col">
            <div className="overflow-x-auto custom-scrollbar">
              <table className="min-w-max text-sm text-left border-collapse">
-               <thead className="bg-slate-100 text-slate-700 uppercase font-bold text-xs sticky top-0 z-10">
+               <thead className="bg-slate-300 text-slate-700 uppercase font-bold text-xs sticky top-0 z-10">
                  <tr>
-                   <th className="p-3 border-b border-r border-slate-200 sticky left-0 bg-slate-100 z-20 shadow-sm text-center min-w-[80px]">Ações</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[140px]">B - PCA</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[160px]">C - Status</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[120px]">D - Prev. Start</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[100px]">E - Prioridade</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[180px]">F - Modalidade</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[250px]">G - Objeto</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[150px]">H - Responsável</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[100px]">I - Prorrogável</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[120px]">J - Início Plan.</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[120px]">K - Fim Plan.</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[150px]">L - Duração</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[120px]">M - Remessa</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[200px]">N - Fiscais/Gestores</th>
-                   <th className="p-3 border-b border-r border-slate-200 min-w-[100px]">O - Prorrogado</th>
-                   <th className="p-3 border-b border-slate-200 min-w-[250px]">P - Observações</th>
+                   <th className="p-3 border-b border-r border-slate-300 sticky left-0 bg-slate-300 z-20 shadow-sm text-center min-w-[80px]">Ações</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[140px]">B - PCA</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[160px]">C - Status</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[120px]">D - Prev. Start</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[100px]">E - Prioridade</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[180px]">F - Modalidade</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[250px]">G - Objeto</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[150px]">H - Responsável</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[100px]">I - Prorrogável</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[120px]">J - Início Plan.</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[120px]">K - Fim Plan.</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[150px]">L - Duração</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[120px]">M - Remessa</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[200px]">N - Fiscais/Gestores</th>
+                   <th className="p-3 border-b border-r border-slate-300 min-w-[100px]">O - Prorrogado</th>
+                   <th className="p-3 border-b border-slate-300 min-w-[250px]">P - Observações</th>
                  </tr>
                </thead>
                <tbody className="divide-y divide-slate-200">
